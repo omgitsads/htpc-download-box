@@ -89,6 +89,8 @@ services:
     container_name: plex-server
     image: plexinc/pms-docker:latest
     restart: unless-stopped
+    devices:
+      - "/dev/dri:/dev/dri"
     environment:
       - TZ=${TZ} # timezone, defined in .env
     network_mode: host
