@@ -11,6 +11,10 @@ services:
       - ${ROOT}/config/vpn:/vpn # OpenVPN configuration
     security_opt:
       - label:disable
+    environment:
+      - VIRTUAL_HOST=deluge.${DNS_ROOT}
+      - LETSENCRYPT_HOST=deluge.${DNS_ROOT}
+      - VIRTAUL_PORT=8112
     ports:
       - 8112:8112 # port for deluge web UI to be reachable from local network
     command: '-f "" -r 192.168.1.0/24' # enable firewall and route local network traffic
@@ -32,11 +36,15 @@ services:
     container_name: jackett
     image: linuxserver/jackett:latest
     restart: unless-stopped
-    network_mode: host
     environment:
       - PUID=${PUID} # default user id, defined in .env
       - PGID=${PGID} # default group id, defined in .env
       - TZ=${TZ} # timezone, defined in .env
+      - VIRTUAL_HOST=jackett.${DNS_ROOT}
+      - LETSENCRYPT_HOST=jackett.${DNS_ROOT}
+      - VIRTAUL_PORT=9117
+    ports:
+      - 9117:9117
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - ${ROOT}/downloads/torrent-blackhole:/downloads # place where to put .torrent files for manual download
@@ -46,11 +54,15 @@ services:
     container_name: nzbget
     image: linuxserver/nzbget:latest
     restart: unless-stopped
-    network_mode: host
     environment:
       - PUID=${PUID} # default user id, defined in .env
       - PGID=${PGID} # default group id, defined in .env
       - TZ=${TZ} # timezone, defined in .env
+      - VIRTUAL_HOST=nzbget.${DNS_ROOT}
+      - LETSENCRYPT_HOST=nzbget.${DNS_ROOT}
+      - VIRTAUL_PORT=6789
+    ports:
+      - 6789:6789
     volumes:
       - ${ROOT}/downloads:/downloads # download folder
       - ${ROOT}/config/nzbget:/config # config files
@@ -59,11 +71,15 @@ services:
     container_name: sonarr
     image: linuxserver/sonarr:latest
     restart: unless-stopped
-    network_mode: host
     environment:
       - PUID=${PUID} # default user id, defined in .env
       - PGID=${PGID} # default group id, defined in .env
       - TZ=${TZ} # timezone, defined in .env
+      - VIRTUAL_HOST=sonarr.${DNS_ROOT}
+      - LETSENCRYPT_HOST=sonarr.${DNS_ROOT}
+      - VIRTAUL_PORT=8989
+    ports:
+      - 8989:8989
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - ${ROOT}/config/sonarr:/config # config files
@@ -74,11 +90,15 @@ services:
     container_name: radarr
     image: linuxserver/radarr:latest
     restart: unless-stopped
-    network_mode: host
     environment:
       - PUID=${PUID} # default user id, defined in .env
       - PGID=${PGID} # default group id, defined in .env
       - TZ=${TZ} # timezone, defined in .env
+      - VIRTUAL_HOST=radarr.${DNS_ROOT}
+      - LETSENCRYPT_HOST=radarr.${DNS_ROOT}
+      - VIRTAUL_PORT=7878
+    ports:
+      - 7878:7878
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - ${ROOT}/config/radarr:/config # config files
@@ -93,7 +113,11 @@ services:
       - "/dev/dri:/dev/dri"
     environment:
       - TZ=${TZ} # timezone, defined in .env
-    network_mode: host
+      - VIRTUAL_HOST=plex.${DNS_ROOT}
+      - LETSENCRYPT_HOST=plex.${DNS_ROOT}
+      - VIRTAUL_PORT=32400
+    ports:
+      - 32400:32400
     volumes:
       - ${ROOT}/config/plex/db:/config # plex database
       - ${ROOT}/config/plex/transcode:/transcode # temp transcoded files
@@ -103,15 +127,85 @@ services:
     container_name: bazarr
     image: linuxserver/bazarr
     restart: unless-stopped
-    network_mode: host
     environment:
       - PUID=${PUID} # default user id, defined in .env
       - PGID=${PGID} # default group id, defined in .env
       - TZ=${TZ} # timezone, defined in .env
       - UMASK_SET=022 #optional
+      - VIRTUAL_HOST=bazarr.${DNS_ROOT}
+      - LETSENCRYPT_HOST=bazarr.${DNS_ROOT}
+      - VIRTUAL_PORT=6767
     volumes:
       - ${ROOT}/config/bazarr:/config # config files
       - ${ROOT}/complete/movies:/movies # movies folder
       - ${ROOT}/complete/tv:/tv # tv shows folder
     ports:
       - 6767:6767
+
+  ombi:
+    container_name: ombi
+    image: linuxserver/ombi
+    restart: unless-stopped
+    environment:
+      - PUID=${PUID} # default user id, defined in .env
+      - PGID=${PGID} # default group id, defined in .env
+      - TZ=${TZ} # timezone, defined in .env
+      - VIRTUAL_HOST=ombi.${DNS_ROOT}
+      - LETSENCRYPT_HOST=ombi.${DNS_ROOT}
+      - VIRTUAL_PORT=3579
+    volumes:
+      - "${ROOT}/config/ombi:/config"
+    ports:
+      - 3579:3579
+
+  tautulli:
+    container_name: tautulli
+    image: linuxserver/tautulli
+    restart: unless-stopped
+    environment:
+      - PUID=${PUID} # default user id, defined in .env
+      - PGID=${PGID} # default group id, defined in .env
+      - TZ=${TZ} # timezone, defined in .env
+      - VIRTUAL_HOST=tautulli.${DNS_ROOT}
+      - LETSENCRYPT_HOST=tautulli.${DNS_ROOT}
+      - VIRTUAL_PORT=8181
+    volumes:
+      - "${ROOT}/config/tautulli:/config"
+    ports:
+      - 8181:8181
+
+  nginx-proxy:
+    container_name: nginx-proxy
+    image: "jwilder/nginx-proxy:latest"
+    restart: unless-stopped
+    labels:
+      - "com.github.jrcs.letsencrypt_nginx_proxy_companion.nginx_proxy"
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - "${ROOT}/config/certs:/etc/nginx/certs"
+      - "${ROOT}/config/nginx/vhost.d:/etc/nginx/vhost.d"
+      - "${ROOT}/config/nginx/html:/usr/share/nginx/html"
+      - "/var/run/docker.sock:/tmp/docker.sock:ro"
+
+  nginx-letsencrypt:
+    image: jrcs/letsencrypt-nginx-proxy-companion
+    container_name: nginx-letsencrypt
+    restart: unless-stopped
+    volumes:
+      - "${ROOT}/config/certs:/etc/nginx/certs"
+      - "${ROOT}/config/nginx/vhost.d:/etc/nginx/vhost.d"
+      - "${ROOT}/config/nginx/html:/usr/share/nginx/html"
+      - "${ROOT}/config/nginx/acme.sh:/etc/acme.sh"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    environment:
+      - DEBUG=1
+      - DEFAULT_EMAIL=me@adamholt.co.uk
+    depends_on:
+      - nginx-proxy
+
+networks:
+  default:
+    external:
+      name: nginx-proxy
